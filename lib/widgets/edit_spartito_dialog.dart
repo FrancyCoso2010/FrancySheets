@@ -5,32 +5,39 @@ import '../models/parte.dart';
 import '../services/parte_storage.dart';
 import 'dart:io';
 
-class AddSpartitoDialog extends StatefulWidget {
-  const AddSpartitoDialog({super.key});
+class EditSpartitoDialog extends StatefulWidget {
+  final Spartito spartito;
+
+  const EditSpartitoDialog({super.key, required this.spartito});
 
   @override
-  State<AddSpartitoDialog> createState() => _AddSpartitoDialogState();
+  State<EditSpartitoDialog> createState() => _EditSpartitoDialogState();
 }
 
-class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
+class _EditSpartitoDialogState extends State<EditSpartitoDialog> {
   final formKey = GlobalKey<FormState>();
-  String titolo = '';
-  String autore = '';
-  String? filePath;
-  String? fileName;
-  Parte? parteSelezionata;
+  late String titolo;
+  late String autore;
+  late String filePath;
+  late String fileName;
+  String? strumento;
   List<Parte> partiDisponibili = [];
 
   @override
   void initState() {
     super.initState();
+    titolo = widget.spartito.titolo;
+    autore = widget.spartito.autore;
+    filePath = widget.spartito.filePath;
+    fileName = File(filePath).uri.pathSegments.last;
+    strumento = widget.spartito.strumento;
     _loadParti();
   }
 
   Future<void> _loadParti() async {
     partiDisponibili = await ParteStorage.load();
-    if (partiDisponibili.isNotEmpty && parteSelezionata == null) {
-      parteSelezionata = partiDisponibili.first;
+    if (partiDisponibili.isNotEmpty && (strumento == null || strumento!.isEmpty)) {
+      strumento = partiDisponibili.first.nome;
     }
     setState(() {});
   }
@@ -46,10 +53,9 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
       if (File(path).existsSync()) {
         setState(() {
           filePath = path;
-          fileName = File(filePath!).uri.pathSegments.last;
+          fileName = File(filePath).uri.pathSegments.last;
         });
       } else {
-        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('File non valido o non trovato')),
         );
@@ -58,7 +64,7 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
   }
 
   void _saveSpartito() {
-    if (!formKey.currentState!.validate() || filePath == null) {
+    if (!formKey.currentState!.validate() || strumento == null || filePath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Completa tutti i campi obbligatori')),
       );
@@ -71,8 +77,8 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
       Spartito(
         titolo: titolo,
         autore: autore,
-        filePath: filePath!,
-        strumento: parteSelezionata!.nome,
+        filePath: filePath,
+        strumento: strumento!,
       ),
     );
   }
@@ -82,7 +88,7 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
     return AlertDialog(
       backgroundColor: const Color(0xFF2A2840),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text("Aggiungi Spartito", style: TextStyle(color: Colors.white)),
+      title: const Text("Modifica Spartito", style: TextStyle(color: Colors.white)),
       content: SingleChildScrollView(
         child: Form(
           key: formKey,
@@ -91,6 +97,7 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
             children: [
               // Titolo
               TextFormField(
+                initialValue: titolo,
                 decoration: const InputDecoration(
                   labelText: 'Titolo',
                   labelStyle: TextStyle(color: Colors.white70),
@@ -103,6 +110,7 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
 
               // Autore
               TextFormField(
+                initialValue: autore,
                 decoration: const InputDecoration(
                   labelText: 'Autore (opzionale)',
                   labelStyle: TextStyle(color: Colors.white70),
@@ -113,8 +121,8 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
               const SizedBox(height: 12),
 
               // Strumento
-              DropdownButtonFormField<Parte>(
-                initialValue: parteSelezionata,
+              DropdownButtonFormField<String>(
+                value: strumento,
                 dropdownColor: const Color(0xFF2E2C45),
                 decoration: const InputDecoration(
                   labelText: 'Strumento',
@@ -122,11 +130,11 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
                 ),
                 items: partiDisponibili
                     .map((p) => DropdownMenuItem(
-                          value: p,
+                          value: p.nome,
                           child: Text(p.nome, style: const TextStyle(color: Colors.white)),
                         ))
                     .toList(),
-                onChanged: (val) => setState(() => parteSelezionata = val),
+                onChanged: (val) => setState(() => strumento = val),
                 validator: (val) => val == null ? 'Seleziona uno strumento' : null,
               ),
               const SizedBox(height: 12),
@@ -139,11 +147,11 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      filePath == null ? 'Seleziona PDF' : 'PDF selezionato: $fileName',
+                      filePath.isEmpty ? 'Seleziona PDF' : 'PDF selezionato: $fileName',
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
-                    if (filePath != null) ...[
+                    if (filePath.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       const Icon(Icons.check_circle, color: Colors.green, size: 20),
                     ],
@@ -159,13 +167,19 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
         ),
       ),
       actions: [
+        // Pulsante elimina
+        TextButton.icon(
+          icon: const Icon(Icons.delete, color: Colors.redAccent),
+          label: const Text('Elimina', style: TextStyle(color: Colors.redAccent)),
+          onPressed: () => Navigator.pop(context, 'delete'),
+        ),
         TextButton(
           child: const Text('Annulla', style: TextStyle(color: Colors.white70)),
           onPressed: () => Navigator.pop(context),
         ),
         ElevatedButton(
-          onPressed: _saveSpartito,
           child: const Text('Salva'),
+          onPressed: _saveSpartito,
         ),
       ],
     );
