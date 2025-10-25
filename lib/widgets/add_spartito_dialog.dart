@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/spartito.dart';
+import 'dart:io';
 
 class AddSpartitoDialog extends StatefulWidget {
   const AddSpartitoDialog({super.key});
@@ -14,6 +15,8 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
   String titolo = '';
   String autore = '';
   String? filePath;
+  String? fileName; // 👈 nuovo campo per il nome del file
+  String strumento = '';
 
   @override
   Widget build(BuildContext context) {
@@ -40,20 +43,33 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
                     const InputDecoration(labelText: 'Autore (opzionale)'),
                 onSaved: (v) => autore = v ?? '',
               ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Strumento (opzionale)'),
+                onSaved: (v) => strumento = v ?? '',
+              ),
               const SizedBox(height: 12),
+              
+              // 🔹 Pulsante selezione PDF
               ElevatedButton.icon(
                 onPressed: () async {
                   final result = await FilePicker.platform.pickFiles(
                     type: FileType.custom,
                     allowedExtensions: ['pdf'],
                   );
+
                   if (result != null && result.files.single.path != null) {
-                    setState(() => filePath = result.files.single.path!);
+                    setState(() {
+                      filePath = result.files.single.path!;
+                      fileName = File(filePath!).uri.pathSegments.last; // 👈 prendi solo il nome file
+                    });
                   }
                 },
                 icon: const Icon(Icons.attach_file),
                 label: Text(
-                  filePath == null ? 'Seleziona PDF' : 'PDF selezionato',
+                  filePath == null
+                      ? 'Seleziona PDF'
+                      : 'PDF selezionato: $fileName', // 👈 testo aggiornato
+                  overflow: TextOverflow.ellipsis,
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple.shade600,
@@ -76,8 +92,14 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
               formKey.currentState!.save();
               Navigator.pop(
                 context,
-                Spartito(titolo: titolo, autore: autore, filePath: filePath!),
+                Spartito(
+                 titolo: titolo,
+                 autore: autore,
+                 filePath: filePath!,
+                 strumento: strumento,
+                ),
               );
+
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Seleziona un file PDF')),
