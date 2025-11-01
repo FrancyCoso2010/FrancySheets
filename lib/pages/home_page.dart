@@ -8,7 +8,7 @@ import '../widgets/add_spartito_dialog.dart';
 import '../widgets/edit_spartito_dialog.dart';
 import '../pages/parti_page.dart';
 
-enum SortOrder { alphabetic, dateAdded, instrument }
+enum SortOrder { alphabetic, instrument }
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,6 +23,7 @@ class _HomePageState extends State<HomePage> {
   String searchQuery = '';
   SortOrder sortOrder = SortOrder.alphabetic;
   String? filtroStrumento;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -31,10 +32,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadData() async {
-    spartiti = await SpartitoStorage.load();
-    partiDisponibili = await ParteStorage.load();
-    _sortList();
-    setState(() {});
+    final spartitiData = await SpartitoStorage.load();
+    final partiData = await ParteStorage.load();
+
+    setState(() {
+      spartiti = spartitiData;
+      partiDisponibili = partiData;
+      _sortList();
+      _isLoading = false;
+    });
   }
 
   Future<void> _save() async => SpartitoStorage.save(spartiti);
@@ -57,17 +63,10 @@ class _HomePageState extends State<HomePage> {
   void _sortList() {
     switch (sortOrder) {
       case SortOrder.alphabetic:
-        spartiti.sort(
-          (a, b) => a.titolo.toLowerCase().compareTo(b.titolo.toLowerCase()),
-        );
-        break;
-      case SortOrder.dateAdded:
-        // mantiene l’ordine di inserimento
+        spartiti.sort((a, b) => a.titolo.toLowerCase().compareTo(b.titolo.toLowerCase()));
         break;
       case SortOrder.instrument:
-        spartiti.sort(
-          (a, b) => a.strumento.toLowerCase().compareTo(b.strumento.toLowerCase()),
-        );
+        spartiti.sort((a, b) => a.strumento.toLowerCase().compareTo(b.strumento.toLowerCase()));
         break;
     }
   }
@@ -144,29 +143,39 @@ class _HomePageState extends State<HomePage> {
     final lista = _filteredList;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: const Color(0xFF1C1B2F),
+
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2E2C45),
-        title: const Text('FrancySheets'),
-        elevation: 4,
+        elevation: 0,
+        title: const Text(
+          'FrancySheets',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF3F2B96), Color(0xFFA8C0FF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           DropdownButtonHideUnderline(
             child: DropdownButton<SortOrder>(
               value: sortOrder,
               dropdownColor: const Color(0xFF2E2C45),
-              icon: const Icon(Icons.sort, color: Colors.white),
+              icon: const Icon(Icons.sort_rounded, color: Colors.white),
               items: const [
                 DropdownMenuItem(
                   value: SortOrder.alphabetic,
-                  child: Text('A-Z', style: TextStyle(color: Colors.white)),
-                ),
-                DropdownMenuItem(
-                  value: SortOrder.dateAdded,
-                  child: Text('Data di aggiunta', style: TextStyle(color: Colors.white)),
+                  child: Text('Ordina A-Z', style: TextStyle(color: Colors.white)),
                 ),
                 DropdownMenuItem(
                   value: SortOrder.instrument,
-                  child: Text('Strumento', style: TextStyle(color: Colors.white)),
+                  child: Text('Per strumento', style: TextStyle(color: Colors.white)),
                 ),
               ],
               onChanged: (value) async {
@@ -185,169 +194,207 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      // 🟣 Drawer per navigazione
       drawer: Drawer(
         backgroundColor: const Color(0xFF2A2840),
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             const DrawerHeader(
-              decoration: BoxDecoration(color: Color(0xFF2E2C45)),
-              child: Text(
-                'Menu',
-                style: TextStyle(color: Colors.white, fontSize: 24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF3F2B96), Color(0xFFA8C0FF)],
+                ),
+              ),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  'FrancySheets',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
             ListTile(
               leading: const Icon(Icons.library_music, color: Colors.white),
               title: const Text('Spartiti', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context); // chiudi drawer
-              },
+              onTap: () => Navigator.pop(context),
             ),
             ListTile(
               leading: const Icon(Icons.music_note, color: Colors.white),
               title: const Text('Parti / Strumenti', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PartiPage()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PartiPage()));
               },
             ),
           ],
         ),
       ),
 
-      body: Column(
+      body: Stack(
         children: [
-          // 🔍 Ricerca
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Cerca spartito...',
-                hintStyle: const TextStyle(color: Colors.white60),
-                prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                filled: true,
-                fillColor: const Color(0xFF2A2840),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+          // sfondo con gradiente
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1C1B2F), Color(0xFF2E2C45)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
-              onChanged: (value) => setState(() => searchQuery = value),
             ),
           ),
 
-          if (filtroStrumento?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  Chip(
-                    backgroundColor: Colors.deepPurple.shade400,
-                    label: Text('Filtro: $filtroStrumento'),
-                    labelStyle: const TextStyle(color: Colors.white),
-                    deleteIcon: const Icon(Icons.close, size: 18, color: Colors.white),
-                    onDeleted: () => setState(() => filtroStrumento = null),
-                  ),
-                ],
-              ),
-            ),
+          Column(
+            children: [
+              const SizedBox(height: 90),
 
-          Expanded(
-            child: lista.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Nessuno spartito trovato',
-                      style: TextStyle(color: Colors.white60),
+              // Barra di ricerca
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: TextField(
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Cerca spartito...',
+                      hintStyle: TextStyle(color: Colors.white60),
+                      prefixIcon: Icon(Icons.search_rounded, color: Colors.white70),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 14),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 80),
-                    itemCount: lista.length,
-                    itemBuilder: (context, i) {
-                      final s = lista[i];
-                      return Card(
-                        color: Colors.deepPurple.shade500,
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 3,
-                        child: ListTile(
-                          leading: const Icon(Icons.music_note, color: Colors.white),
-                          title: Text(
-                            s.titolo,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    s.autore.isNotEmpty ? s.autore : '',
-                                    style: const TextStyle(color: Colors.white70),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (s.strumento.isNotEmpty)
-                                  Text(
-                                    "Strumento: ${s.strumento}",
-                                    style: const TextStyle(
-                                        color: Colors.white54, fontSize: 13),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          onTap: () => _openSpartito(s),
-                          onLongPress: () async {
-                            final result = await showDialog(
-                              context: context,
-                              builder: (_) => EditSpartitoDialog(spartito: s),
-                            );
-
-                            if (result == null) return;
-
-                            if (result == 'delete') {
-                              setState(() => spartiti.remove(s));
-                              _save();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Spartito eliminato')),
-                              );
-                            } else if (result is Spartito) {
-                              setState(() {
-                                final index = spartiti.indexOf(s);
-                                spartiti[index] = result;
-                                _sortList();
-                              });
-                              _save();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Spartito modificato')),
-                              );
-                            }
-                          },
-                        ),
-                      );
-                    },
+                    onChanged: (value) => setState(() => searchQuery = value),
                   ),
+                ),
+              ),
+
+              if (filtroStrumento?.isNotEmpty == true)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Chip(
+                        backgroundColor: Colors.deepPurple.shade400,
+                        label: Text('Filtro: $filtroStrumento'),
+                        labelStyle: const TextStyle(color: Colors.white),
+                        deleteIcon: const Icon(Icons.close, size: 18, color: Colors.white),
+                        onDeleted: () => setState(() => filtroStrumento = null),
+                      ),
+                    ],
+                  ),
+                ),
+
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
+                      )
+                    : AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: lista.isEmpty
+                            ? const Center(
+                                key: ValueKey('empty'),
+                                child: Text(
+                                  'Nessuno spartito trovato',
+                                  style: TextStyle(color: Colors.white60, fontSize: 16),
+                                ),
+                              )
+                            : ListView.builder(
+                                key: const ValueKey('list'),
+                                padding: const EdgeInsets.only(bottom: 80),
+                                itemCount: lista.length,
+                                itemBuilder: (context, i) {
+                                  final s = lista[i];
+                                  return AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    curve: Curves.easeOut,
+                                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.07),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: Colors.white10),
+                                    ),
+                                    child: ListTile(
+                                      leading: const Icon(Icons.music_note_rounded, color: Colors.white),
+                                      title: Text(
+                                        s.titolo,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                s.autore.isNotEmpty ? s.autore : '',
+                                                style: const TextStyle(color: Colors.white70),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (s.strumento.isNotEmpty)
+                                              Text(
+                                                s.strumento,
+                                                style: const TextStyle(
+                                                    color: Colors.white54, fontSize: 13),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      onTap: () => _openSpartito(s),
+                                      onLongPress: () async {
+                                        final result = await showDialog(
+                                          context: context,
+                                          builder: (_) => EditSpartitoDialog(spartito: s),
+                                        );
+
+                                        if (result == null) return;
+
+                                        if (result == 'delete') {
+                                          setState(() => spartiti.remove(s));
+                                          _save();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Spartito eliminato')),
+                                          );
+                                        } else if (result is Spartito) {
+                                          setState(() {
+                                            final index = spartiti.indexOf(s);
+                                            spartiti[index] = result;
+                                            _sortList();
+                                          });
+                                          _save();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Spartito modificato')),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+              ),
+            ],
           ),
         ],
       ),
 
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addSpartito,
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded, size: 28),
         label: const Text("Aggiungi"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color(0xFF6C63FF),
+        foregroundColor: Colors.white,
       ),
     );
   }

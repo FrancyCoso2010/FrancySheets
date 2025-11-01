@@ -11,9 +11,11 @@ class PdfViewerPage extends StatefulWidget {
 }
 
 class _PdfViewerPageState extends State<PdfViewerPage> {
-  late final PdfController _pdfController;
+  late PdfController _pdfController;
   bool _isLoading = true;
   String? _error;
+  int _totalPages = 0;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -23,9 +25,14 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
 
   Future<void> _initPdf() async {
     try {
+      final document = await PdfDocument.openFile(widget.spartito.filePath);
+      _totalPages = document.pagesCount;
+
       _pdfController = PdfController(
-        document: Future.value(await PdfDocument.openFile(widget.spartito.filePath)),
+        document: Future.value(document),
+        initialPage: 1,
       );
+
       setState(() => _isLoading = false);
     } catch (e) {
       setState(() {
@@ -41,30 +48,52 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
     super.dispose();
   }
 
+  void _goToNextPage() {
+    if (_currentPage < _totalPages) {
+      _pdfController.nextPage(
+        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 250),
+      );
+    }
+  }
+
+  void _goToPreviousPage() {
+    if (_currentPage > 1) {
+      _pdfController.previousPage(
+        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 250),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // Sfondo bianco
       appBar: AppBar(
-        title: Text(widget.spartito.titolo),
-        backgroundColor: const Color(0xFF2E2C45),
+        elevation: 2,
+        title: Text(
+          widget.spartito.titolo,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: const Color(0xFF6C63FF),
+        centerTitle: true,
       ),
-      backgroundColor: Colors.black,
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: Colors.deepPurpleAccent),
+              child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
             )
           : _error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error, color: Colors.red, size: 48),
+                      const Icon(Icons.error_outline_rounded,
+                          color: Colors.redAccent, size: 50),
                       const SizedBox(height: 16),
-                      Text(
+                      const Text(
                         'Impossibile aprire lo spartito',
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 18),
-                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black87, fontSize: 18),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -76,44 +105,54 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
                     ],
                   ),
                 )
-              : PdfView(
-                  controller: _pdfController,
-                  scrollDirection: Axis.horizontal, // horizontal swiping
-                  pageSnapping: true,               // snap to page
-                  backgroundDecoration:
-                      const BoxDecoration(color: Colors.black),
-                  onPageChanged: (page) {
-                    // Optional: do something when page changes
-                  },
+              : Stack(
+                  children: [
+                    GestureDetector(
+                      // 👆 Tap a sinistra/destra per cambiare pagina
+                      behavior: HitTestBehavior.translucent,
+                      onTapUp: (details) {
+                        final width = MediaQuery.of(context).size.width;
+                        if (details.localPosition.dx < width / 2) {
+                          _goToPreviousPage();
+                        } else {
+                          _goToNextPage();
+                        }
+                      },
+                      child: PdfView(
+                        controller: _pdfController,
+                        scrollDirection: Axis.horizontal,
+                        pageSnapping: true, // scorre di 1 pagina alla volta
+                        backgroundDecoration:
+                            const BoxDecoration(color: Colors.white),
+                        onPageChanged: (page) {
+                          setState(() => _currentPage = page);
+                        },
+                      ),
+                    ),
+
+                    // 📄 Indicatore pagina in basso al centro
+                    Positioned(
+                      bottom: 12,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$_currentPage / $_totalPages',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-      floatingActionButton: _isLoading || _error != null
-          ? null
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FloatingActionButton(
-                  heroTag: 'prev',
-                  onPressed: () {
-                    _pdfController.previousPage(
-                      curve: Curves.easeInOut, // smooth animation
-                      duration: const Duration(milliseconds: 300),
-                    );
-                  },
-                  child: const Icon(Icons.arrow_back),
-                ),
-                const SizedBox(width: 16),
-                FloatingActionButton(
-                  heroTag: 'next',
-                  onPressed: () {
-                    _pdfController.nextPage(
-                      curve: Curves.easeInOut, // smooth animation
-                      duration: const Duration(milliseconds: 300),
-                    );
-                  },
-                  child: const Icon(Icons.arrow_forward),
-                ),
-              ],
-            ),
     );
   }
 }

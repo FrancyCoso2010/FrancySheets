@@ -1,4 +1,4 @@
-package com.example.francy_sheets
+package org.francycoso.francy_sheets
 
 import io.flutter.embedding.android.FlutterActivity
 
