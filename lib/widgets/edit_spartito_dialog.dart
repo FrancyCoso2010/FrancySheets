@@ -1,3 +1,4 @@
+// widgets/edit_spartito_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/spartito.dart';
@@ -15,31 +16,44 @@ class EditSpartitoDialog extends StatefulWidget {
 }
 
 class _EditSpartitoDialogState extends State<EditSpartitoDialog> {
-  final formKey = GlobalKey<FormState>();
-  late String titolo;
-  late String autore;
-  late String filePath;
-  late String fileName;
-  String? strumento;
-  List<Parte> partiDisponibili = [];
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titoloController;
+  late final TextEditingController _autoreController;
+  String? _filePath;
+  String? _fileName;
+  String? _strumento;
+  List<Parte> _partiDisponibili = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    titolo = widget.spartito.titolo;
-    autore = widget.spartito.autore;
-    filePath = widget.spartito.filePath;
-    fileName = File(filePath).uri.pathSegments.last;
-    strumento = widget.spartito.strumento;
+    _titoloController = TextEditingController(text: widget.spartito.titolo);
+    _autoreController = TextEditingController(text: widget.spartito.autore);
+    _filePath = widget.spartito.filePath;
+    _fileName = File(_filePath!).uri.pathSegments.last;
+    _strumento = widget.spartito.strumento;
     _loadParti();
   }
 
+  @override
+  void dispose() {
+    _titoloController.dispose();
+    _autoreController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadParti() async {
-    partiDisponibili = await ParteStorage.load();
-    if (partiDisponibili.isNotEmpty && (strumento == null || strumento!.isEmpty)) {
-      strumento = partiDisponibili.first.nome;
+    final parti = await ParteStorage.load();
+    if (mounted) {
+      setState(() {
+        _partiDisponibili = parti;
+        if (_strumento == null || _strumento!.isEmpty) {
+          _strumento = parti.isNotEmpty ? parti.first.nome : null;
+        }
+        _isLoading = false;
+      });
     }
-    setState(() {});
   }
 
   Future<void> _pickFile() async {
@@ -48,138 +62,176 @@ class _EditSpartitoDialogState extends State<EditSpartitoDialog> {
       allowedExtensions: ['pdf'],
     );
 
-    if (result != null && result.files.single.path != null) {
-      final path = result.files.single.path!;
-      if (File(path).existsSync()) {
+    if (result?.files.single.path != null) {
+      final path = result!.files.single.path!;
+      final file = File(path);
+      if (await file.exists()) {
+        final size = await file.length();
+        if (size == 0) {
+          _showError('Il file PDF è vuoto.');
+          return;
+        }
+        if (size > 100 * 1024 * 1024) {
+          _showError('Il PDF è troppo grande (massimo 100 MB).');
+          return;
+        }
+
         setState(() {
-          filePath = path;
-          fileName = File(filePath).uri.pathSegments.last;
+          _filePath = path;
+          _fileName = file.uri.pathSegments.last;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File non valido o non trovato')),
-        );
+        _showError('File non trovato.');
       }
     }
   }
 
-  void _saveSpartito() {
-    if (!formKey.currentState!.validate() || strumento == null || filePath.isEmpty) {
+  void _showError(String message) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa tutti i campi obbligatori')),
+        SnackBar(content: Text(message)),
       );
+    }
+  }
+
+  void _saveSpartito() {
+    if (_formKey.currentState?.validate() != true || _filePath == null || _strumento == null) {
+      _showError('Completa tutti i campi obbligatori.');
       return;
     }
 
-    formKey.currentState!.save();
     Navigator.pop(
       context,
       Spartito(
-        titolo: titolo,
-        autore: autore,
-        filePath: filePath,
-        strumento: strumento!,
+        id: widget.spartito.id,
+        titolo: _titoloController.text.trim(),
+        autore: _autoreController.text.trim(),
+        filePath: _filePath!,
+        strumento: _strumento!,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return AlertDialog(
-      backgroundColor: const Color(0xFF2A2840),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text("Modifica Spartito", style: TextStyle(color: Colors.white)),
-      content: SingleChildScrollView(
-        child: Form(
-          key: formKey,
+      title: Text(
+        'Modifica Spartito',
+        style: textTheme.titleLarge?.copyWith(color: colorScheme.onSurface),
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Titolo
-              TextFormField(
-                initialValue: titolo,
-                decoration: const InputDecoration(
-                  labelText: 'Titolo',
-                  labelStyle: TextStyle(color: Colors.white70),
-                ),
-                style: const TextStyle(color: Colors.white),
-                validator: (v) => v == null || v.isEmpty ? 'Titolo obbligatorio' : null,
-                onSaved: (v) => titolo = v!,
-              ),
-              const SizedBox(height: 12),
-
-              // Autore
-              TextFormField(
-                initialValue: autore,
-                decoration: const InputDecoration(
-                  labelText: 'Autore (opzionale)',
-                  labelStyle: TextStyle(color: Colors.white70),
-                ),
-                style: const TextStyle(color: Colors.white),
-                onSaved: (v) => autore = v ?? '',
-              ),
-              const SizedBox(height: 12),
-
-              // Strumento
-              DropdownButtonFormField<String>(
-                value: strumento,
-                dropdownColor: const Color(0xFF2E2C45),
-                decoration: const InputDecoration(
-                  labelText: 'Strumento',
-                  labelStyle: TextStyle(color: Colors.white70),
-                ),
-                items: partiDisponibili
-                    .map((p) => DropdownMenuItem(
-                          value: p.nome,
-                          child: Text(p.nome, style: const TextStyle(color: Colors.white)),
-                        ))
-                    .toList(),
-                onChanged: (val) => setState(() => strumento = val),
-                validator: (val) => val == null ? 'Seleziona uno strumento' : null,
-              ),
-              const SizedBox(height: 12),
-
-              // PDF
-              ElevatedButton.icon(
-                onPressed: _pickFile,
-                icon: const Icon(Icons.attach_file),
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
+              Form(
+                key: _formKey,
+                child: Column(
                   children: [
-                    Text(
-                      filePath.isEmpty ? 'Seleziona PDF' : 'PDF selezionato: $fileName',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                    // Titolo
+                    TextFormField(
+                      controller: _titoloController,
+                      decoration: InputDecoration(
+                        labelText: 'Titolo *',
+                        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                        border: const OutlineInputBorder(),
+                      ),
+                      validator: (v) => v?.trim().isEmpty == true ? 'Titolo obbligatorio' : null,
                     ),
-                    if (filePath.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      const Icon(Icons.check_circle, color: Colors.green, size: 20),
-                    ],
+                    const SizedBox(height: 16),
+
+                    // Autore
+                    TextFormField(
+                      controller: _autoreController,
+                      decoration: InputDecoration(
+                        labelText: 'Autore (opzionale)',
+                        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Strumento
+                    if (_isLoading)
+                      const CircularProgressIndicator()
+                    else if (_partiDisponibili.isEmpty)
+                      Text(
+                        'Nessuna parte disponibile.',
+                        style: TextStyle(color: colorScheme.error),
+                        textAlign: TextAlign.center,
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        value: _strumento,
+                        decoration: InputDecoration(
+                          labelText: 'Strumento *',
+                          labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: _partiDisponibili
+                            .map((p) => DropdownMenuItem(
+                                  value: p.nome,
+                                  child: Text(p.nome),
+                                ))
+                            .toList(),
+                        onChanged: (val) => setState(() => _strumento = val),
+                        validator: (val) => val == null ? 'Seleziona uno strumento' : null,
+                      ),
+                    if (!_isLoading && _partiDisponibili.isNotEmpty) const SizedBox(height: 16),
+
+                    // PDF
+                    if (!_isLoading)
+                      OutlinedButton.icon(
+                        onPressed: _pickFile,
+                        icon: const Icon(Icons.attach_file),
+                        label: Text(
+                          _filePath == null
+                              ? 'Cambia PDF'
+                              : 'Attuale: $_fileName',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.onSurface,
+                          side: BorderSide(color: colorScheme.outline),
+                        ),
+                      ),
                   ],
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple.shade600,
-                  foregroundColor: Colors.white,
                 ),
               ),
             ],
           ),
         ),
       ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
-        // Pulsante elimina
+        // Elimina (sinistra)
         TextButton.icon(
-          icon: const Icon(Icons.delete, color: Colors.redAccent),
-          label: const Text('Elimina', style: TextStyle(color: Colors.redAccent)),
           onPressed: () => Navigator.pop(context, 'delete'),
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Elimina'),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.red.shade700,
+            padding: EdgeInsets.zero,
+          ),
         ),
-        TextButton(
-          child: const Text('Annulla', style: TextStyle(color: Colors.white70)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        ElevatedButton(
-          child: const Text('Salva'),
-          onPressed: _saveSpartito,
+        // Annulla + Salva (destra)
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Annulla', style: TextStyle(color: colorScheme.primary)),
+            ),
+            FilledButton(
+              onPressed: _saveSpartito,
+              child: const Text('Salva'),
+            ),
+          ],
         ),
       ],
     );

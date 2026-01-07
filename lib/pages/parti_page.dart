@@ -1,4 +1,6 @@
+// parti_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/parte.dart';
 import '../services/parte_storage.dart';
 
@@ -20,67 +22,38 @@ class _PartiPageState extends State<PartiPage> {
 
   Future<void> _load() async {
     parti = await ParteStorage.load();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
-  Future<void> _save() async {
-    await ParteStorage.save(parti);
-  }
+  Future<void> _save() async => ParteStorage.save(parti);
 
   void _addParteDialog() {
-    String nome = '';
+    final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (_) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF2A2840),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            '🎶 Aggiungi Parte',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
+          title: const Text('Aggiungi parte'),
           content: TextField(
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Nome parte (es. Pianoforte)',
-              labelStyle: const TextStyle(color: Colors.white70),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.white24),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.deepPurpleAccent),
-              ),
-              filled: true,
-              fillColor: const Color(0xFF1F1D36),
-            ),
-            onChanged: (v) => nome = v,
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Nome (es. Clarinetto)'),
           ),
           actions: [
-            TextButton(
-              child: const Text('Annulla', style: TextStyle(color: Colors.white70)),
-              onPressed: () => Navigator.pop(context),
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.save_alt_rounded, size: 18),
-              label: const Text('Salva'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+            TextButton(onPressed: Navigator.of(context).pop, child: const Text('Annulla')),
+            FilledButton(
               onPressed: () {
-                if (nome.trim().isNotEmpty) {
-                  setState(() => parti.add(Parte(nome: nome.trim())));
+                final nome = controller.text.trim();
+                if (nome.isNotEmpty) {
+                  setState(() => parti.add(Parte(nome: nome)));
                   _save();
                   Navigator.pop(context);
                 }
               },
+              child: const Text('Aggiungi'),
             ),
           ],
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
         );
       },
     );
@@ -90,34 +63,18 @@ class _PartiPageState extends State<PartiPage> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2840),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Elimina parte',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Vuoi davvero eliminare "${parte.nome}"?',
-          style: const TextStyle(color: Colors.white70),
-        ),
+        title: const Text('Elimina parte'),
+        content: Text('Eliminare "${parte.nome}"? Questa azione è irreversibile.'),
         actions: [
-          TextButton(
-            child: const Text('Annulla', style: TextStyle(color: Colors.white70)),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.delete_forever_rounded, size: 18),
-            label: const Text('Elimina'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
+          TextButton(onPressed: Navigator.of(context).pop, child: const Text('Annulla')),
+          FilledButton.tonal(
             onPressed: () {
               setState(() => parti.remove(parte));
               _save();
               Navigator.pop(context);
             },
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            child: const Text('Elimina'),
           ),
         ],
       ),
@@ -126,91 +83,67 @@ class _PartiPageState extends State<PartiPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: const Color(0xFF1C1B2F),
       appBar: AppBar(
-        elevation: 0,
-        title: const Text('Parti / Strumenti', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF3F2B96), Color(0xFFA8C0FF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
+        title: const Text('Parti / Strumenti'),
+        backgroundColor: const Color(0xFF5B4C9C),
       ),
-      body: Stack(
-        children: [
-          // sfondo con gradiente
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF1C1B2F), Color(0xFF2E2C45)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+      body: parti.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.music_note_outlined, size: 56, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Nessuna parte disponibile',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16),
+                  ),
+                ],
               ),
-            ),
-          ),
-
-          Column(
-            children: [
-              const SizedBox(height: 100),
-
-              Expanded(
-                child: parti.isEmpty
-                    ? const Center(
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.only(top: 4, bottom: 72),
+              itemCount: parti.length,
+              itemBuilder: (context, i) {
+                final p = parti[i];
+                return Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: colorScheme.outline.withOpacity(0.1), width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.music_note, size: 20),
+                      const SizedBox(width: 14),
+                      Expanded(
                         child: Text(
-                          'Nessuna parte aggiunta 🎺',
-                          style: TextStyle(color: Colors.white60, fontSize: 16),
+                          p.nome,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 80),
-                        itemCount: parti.length,
-                        itemBuilder: (context, i) {
-                          final p = parti[i];
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOut,
-                            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white10),
-                            ),
-                            child: ListTile(
-                              leading: const Icon(Icons.music_note_rounded, color: Colors.white),
-                              title: Text(
-                                p.nome,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                                onPressed: () => _removeParte(p),
-                              ),
-                            ),
-                          );
-                        },
                       ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashRadius: 20,
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        color: Colors.red.shade600,
+                        onPressed: () => _removeParte(p),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addParteDialog,
-        icon: const Icon(Icons.add_rounded, size: 28),
+        tooltip: 'Aggiungi nuova parte',
+        icon: const Icon(Icons.add),
         label: const Text("Aggiungi"),
-        backgroundColor: const Color(0xFF6C63FF),
-        foregroundColor: Colors.white,
       ),
     );
   }

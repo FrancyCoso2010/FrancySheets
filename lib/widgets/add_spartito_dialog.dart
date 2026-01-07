@@ -1,3 +1,4 @@
+// widgets/add_spartito_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/spartito.dart';
@@ -13,13 +14,14 @@ class AddSpartitoDialog extends StatefulWidget {
 }
 
 class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
-  final formKey = GlobalKey<FormState>();
-  String titolo = '';
-  String autore = '';
-  String? filePath;
-  String? fileName;
-  Parte? parteSelezionata;
-  List<Parte> partiDisponibili = [];
+  final _formKey = GlobalKey<FormState>();
+  final _titoloController = TextEditingController();
+  final _autoreController = TextEditingController();
+  String? _filePath;
+  String? _fileName;
+  Parte? _parteSelezionata;
+  List<Parte> _partiDisponibili = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -27,131 +29,171 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
     _loadParti();
   }
 
+  @override
+  void dispose() {
+    _titoloController.dispose();
+    _autoreController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadParti() async {
-    partiDisponibili = await ParteStorage.load();
-    if (partiDisponibili.isNotEmpty && parteSelezionata == null) {
-      parteSelezionata = partiDisponibili.first;
+    final parti = await ParteStorage.load();
+    if (mounted) {
+      setState(() {
+        _partiDisponibili = parti;
+        _parteSelezionata = parti.isNotEmpty ? parti.first : null;
+        _isLoading = false;
+      });
     }
-    setState(() {});
   }
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
+      withData: false,
     );
 
-    if (result != null && result.files.single.path != null) {
-      final path = result.files.single.path!;
-      if (File(path).existsSync()) {
+    if (result?.files.single.path != null) {
+      final path = result!.files.single.path!;
+      final file = File(path);
+      if (await file.exists()) {
+        final size = await file.length();
+        if (size == 0) {
+          _showError('Il file PDF è vuoto.');
+          return;
+        }
+        if (size > 100 * 1024 * 1024) {
+          // Limite: 100 MB
+          _showError('Il PDF è troppo grande (massimo 100 MB).');
+          return;
+        }
+
         setState(() {
-          filePath = path;
-          fileName = File(filePath!).uri.pathSegments.last;
+          _filePath = path;
+          _fileName = file.uri.pathSegments.last;
         });
       } else {
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File non valido o non trovato')),
-        );
+        _showError('File non trovato.');
       }
     }
   }
 
-  void _saveSpartito() {
-    if (!formKey.currentState!.validate() || filePath == null) {
+  void _showError(String message) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa tutti i campi obbligatori')),
+        SnackBar(content: Text(message)),
       );
+    }
+  }
+
+  void _saveSpartito() {
+    if (_formKey.currentState?.validate() != true || _filePath == null || _parteSelezionata == null) {
+      _showError('Completa tutti i campi obbligatori e seleziona un PDF valido.');
       return;
     }
 
-    formKey.currentState!.save();
     Navigator.pop(
       context,
       Spartito(
-        titolo: titolo,
-        autore: autore,
-        filePath: filePath!,
-        strumento: parteSelezionata!.nome,
+        id: null,
+        titolo: _titoloController.text.trim(),
+        autore: _autoreController.text.trim(),
+        filePath: _filePath!,
+        strumento: _parteSelezionata!.nome,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return AlertDialog(
-      backgroundColor: const Color(0xFF2A2840),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text("Aggiungi Spartito", style: TextStyle(color: Colors.white)),
-      content: SingleChildScrollView(
-        child: Form(
-          key: formKey,
+      title: Text(
+        'Aggiungi Spartito',
+        style: textTheme.titleLarge?.copyWith(color: colorScheme.onSurface),
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Titolo
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'Titolo',
-                  labelStyle: TextStyle(color: Colors.white70),
-                ),
-                style: const TextStyle(color: Colors.white),
-                validator: (v) => v == null || v.isEmpty ? 'Titolo obbligatorio' : null,
-                onSaved: (v) => titolo = v!,
-              ),
-              const SizedBox(height: 12),
-
-              // Autore
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'Autore (opzionale)',
-                  labelStyle: TextStyle(color: Colors.white70),
-                ),
-                style: const TextStyle(color: Colors.white),
-                onSaved: (v) => autore = v ?? '',
-              ),
-              const SizedBox(height: 12),
-
-              // Strumento
-              DropdownButtonFormField<Parte>(
-                initialValue: parteSelezionata,
-                dropdownColor: const Color(0xFF2E2C45),
-                decoration: const InputDecoration(
-                  labelText: 'Strumento',
-                  labelStyle: TextStyle(color: Colors.white70),
-                ),
-                items: partiDisponibili
-                    .map((p) => DropdownMenuItem(
-                          value: p,
-                          child: Text(p.nome, style: const TextStyle(color: Colors.white)),
-                        ))
-                    .toList(),
-                onChanged: (val) => setState(() => parteSelezionata = val),
-                validator: (val) => val == null ? 'Seleziona uno strumento' : null,
-              ),
-              const SizedBox(height: 12),
-
-              // PDF
-              ElevatedButton.icon(
-                onPressed: _pickFile,
-                icon: const Icon(Icons.attach_file),
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
+              Form(
+                key: _formKey,
+                child: Column(
                   children: [
-                    Text(
-                      filePath == null ? 'Seleziona PDF' : 'PDF selezionato: $fileName',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                    // Titolo
+                    TextFormField(
+                      controller: _titoloController,
+                      decoration: InputDecoration(
+                        labelText: 'Titolo *',
+                        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                        border: const OutlineInputBorder(),
+                      ),
+                      validator: (v) => v?.trim().isEmpty == true ? 'Titolo obbligatorio' : null,
                     ),
-                    if (filePath != null) ...[
-                      const SizedBox(width: 6),
-                      const Icon(Icons.check_circle, color: Colors.green, size: 20),
-                    ],
+                    const SizedBox(height: 16),
+
+                    // Autore
+                    TextFormField(
+                      controller: _autoreController,
+                      decoration: InputDecoration(
+                        labelText: 'Autore (opzionale)',
+                        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Strumento
+                    if (_isLoading)
+                      const CircularProgressIndicator()
+                    else if (_partiDisponibili.isEmpty)
+                      Text(
+                        'Nessuna parte disponibile. Vai in "Parti / Strumenti" per aggiungerne.',
+                        style: TextStyle(color: colorScheme.error),
+                        textAlign: TextAlign.center,
+                      )
+                    else
+                      DropdownButtonFormField<Parte>(
+                        value: _parteSelezionata,
+                        decoration: InputDecoration(
+                          labelText: 'Strumento *',
+                          labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: _partiDisponibili
+                            .map((p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text(p.nome),
+                                ))
+                            .toList(),
+                        onChanged: (val) => setState(() => _parteSelezionata = val),
+                        validator: (val) => val == null ? 'Seleziona uno strumento' : null,
+                      ),
+                    if (!_isLoading && _partiDisponibili.isNotEmpty) const SizedBox(height: 16),
+
+                    // PDF
+                    if (!_isLoading)
+                      OutlinedButton.icon(
+                        onPressed: _pickFile,
+                        icon: const Icon(Icons.attach_file),
+                        label: Text(
+                          _filePath == null
+                              ? 'Seleziona PDF (massimo 100 MB)'
+                              : 'Selezionato: $_fileName',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.onSurface,
+                          side: BorderSide(color: colorScheme.outline),
+                        ),
+                      ),
                   ],
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple.shade600,
-                  foregroundColor: Colors.white,
                 ),
               ),
             ],
@@ -160,12 +202,12 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
       ),
       actions: [
         TextButton(
-          child: const Text('Annulla', style: TextStyle(color: Colors.white70)),
           onPressed: () => Navigator.pop(context),
+          child: Text('Annulla', style: TextStyle(color: colorScheme.primary)),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: _saveSpartito,
-          child: const Text('Salva'),
+          child: const Text('Aggiungi'),
         ),
       ],
     );

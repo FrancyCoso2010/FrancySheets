@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
+import 'models/theme.dart';
 
 void main() {
   runApp(const FrancySheetsApp());
@@ -13,16 +14,7 @@ class FrancySheetsApp extends StatelessWidget {
     return MaterialApp(
       title: 'FrancySheets',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF1C1B2F),
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.deepPurple,
-          secondary: Colors.redAccent,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF2E2C45),
-        ),
-      ),
+      theme: appTheme,
       home: const HomePage(),
     );
   }
