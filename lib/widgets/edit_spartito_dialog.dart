@@ -166,7 +166,7 @@ class _EditSpartitoDialogState extends State<EditSpartitoDialog> {
                       )
                     else
                       DropdownButtonFormField<String>(
-                        value: _strumento,
+                        initialValue: _strumento,
                         decoration: InputDecoration(
                           labelText: 'Strumento *',
                           labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
@@ -209,7 +209,6 @@ class _EditSpartitoDialogState extends State<EditSpartitoDialog> {
       ),
       actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
-        // Elimina (sinistra)
         TextButton.icon(
           onPressed: () => Navigator.pop(context, 'delete'),
           icon: const Icon(Icons.delete_outline),
@@ -219,7 +218,6 @@ class _EditSpartitoDialogState extends State<EditSpartitoDialog> {
             padding: EdgeInsets.zero,
           ),
         ),
-        // Annulla + Salva (destra)
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [

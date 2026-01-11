@@ -96,7 +96,6 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
     Navigator.pop(
       context,
       Spartito(
-        id: null,
         titolo: _titoloController.text.trim(),
         autore: _autoreController.text.trim(),
         filePath: _filePath!,
@@ -159,7 +158,7 @@ class _AddSpartitoDialogState extends State<AddSpartitoDialog> {
                       )
                     else
                       DropdownButtonFormField<Parte>(
-                        value: _parteSelezionata,
+                        initialValue: _parteSelezionata,
                         decoration: InputDecoration(
                           labelText: 'Strumento *',
                           labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
